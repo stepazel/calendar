@@ -1,7 +1,9 @@
 ﻿@page "/"
+@using global::Calendar.Meetings
 @using Microsoft.AspNetCore.Components.Authorization
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
+@inject MeetingService MeetingService
 
 <h3>Kalendář</h3>
 
@@ -11,7 +13,13 @@
 }
 else
 {
-  <p>Ahoj, @_userName! Tvůj e-mail je @_email. Tvé UserId je @_userId.</p>
+  <p>Ahoj, @_userName!</p>
+  <button @onclick="GenerateLink">Vytvoř odkaz pro sjednání schůzky</button>
+  if (_generatedLink is not null)
+  {
+    <p>Odkaz pro vytvoření nové schůzky: @_generatedLink</p>
+  }
+  <NavLink href="/calendar">Otevřít kalendář</NavLink>
   <button @onclick="Logout">Odhlášení</button>
 }
 
@@ -19,8 +27,9 @@ else
 @code {
   bool _isAuthenticated;
   string _userName = string.Empty;
-  string _email = string.Empty;
   string _userId = string.Empty;
+
+  string? _generatedLink;
 
 
   protected override async Task OnInitializedAsync()
@@ -31,12 +40,15 @@ else
     {
       _isAuthenticated = true;
       _userName = user.Identity.Name ?? "Uživatel";
-      _email = user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.Email)?.Value ?? "Neznámý e-mail";
       _userId = user.FindFirst(c => c.Type == "UserId")?.Value ?? "Neznámé ID";
     }
   }
 
-
   void Login() => Navigation.NavigateTo("/login", true);
   void Logout() => Navigation.NavigateTo("/logout", true);
-}
+
+  async Task GenerateLink()
+  {
+    _generatedLink = await MeetingService.GenerateLink(Convert.ToInt32(_userId), Navigation.BaseUri.TrimEnd('/'));
+  }
+}}

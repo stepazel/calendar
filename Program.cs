@@ -1,6 +1,7 @@
 using System.Data;
 using System.Security.Claims;
 using Calendar.Components;
+using Calendar.Meetings;
 using Calendar.Users;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -13,6 +14,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddScoped<IDbConnection>(_ => new Microsoft.Data.SqlClient.SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddTransient<UserService>();
+builder.Services.AddTransient<MeetingService>();
 
 builder.Services.AddAuthentication(options =>
     {

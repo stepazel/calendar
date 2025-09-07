@@ -1,0 +1,60 @@
+@page "/sjednani-schuzky/{Id:guid}"
+
+<h3>Sjednání schůzky</h3>
+
+@if (_isUsed)
+{
+  <p>Tento odkaz již byl použit.</p>
+}
+else if (_loading)
+{
+  <p>Načítám data…</p>
+}
+else
+{
+  
+
+  <h4>Stávající schůzky pro tento měsíc:</h4>
+  <ul>
+    @foreach (var m in _existingMeetings)
+    {
+      <li>@m.ScheduledAt.ToString("g")</li>
+    }
+  </ul>
+}
+
+@code {
+  [Parameter] public Guid Id { get; set; }
+
+  private bool _isUsed;
+  private bool _loading = true;
+  private List<PrivateMeeting> _existingMeetings = new();
+  private NewMeetingDto _newMeeting = new();
+
+  [Inject] MeetingService MeetingService { get; set; } = null!;
+
+  protected override async Task OnInitializedAsync()
+  {
+    var link = await MeetingService.GetMeetingLinkAsync(Id);
+
+    if (link == null || link.IsUsed)
+    {
+      _isUsed = true;
+    }
+    else
+    {
+      _existingMeetings = await MeetingService.GetUserMeetingsForMonthAsync(link.UserId, DateTime.UtcNow);
+    }
+
+    _loading = false;
+  }
+
+  private async Task CreateMeeting()
+  {
+    await MeetingService.CreateMeetingAsync(Id, _newMeeting);
+    await MeetingService.MarkLinkAsUsedAsync(Id);
+
+    _existingMeetings = await MeetingService.GetUserMeetingsForMonthAsync(
+      (await MeetingService.GetMeetingLinkAsync(Id))!.UserId, DateTime.UtcNow);
+  }
+}
