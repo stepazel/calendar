@@ -3,9 +3,7 @@
 @inject NavigationManager Navigation
 @inject AuthenticationStateProvider AuthenticationStateProvider
 
-
 <h3>Kalendář</h3>
-
 
 @if (!_isAuthenticated)
 {
@@ -13,7 +11,7 @@
 }
 else
 {
-  <p>Ahoj, @_userName! Tvůj e-mail je @_email.</p>
+  <p>Ahoj, @_userName! Tvůj e-mail je @_email. Tvé UserId je @_userId.</p>
   <button @onclick="Logout">Odhlášení</button>
 }
 
@@ -22,6 +20,7 @@ else
   bool _isAuthenticated;
   string _userName = string.Empty;
   string _email = string.Empty;
+  string _userId = string.Empty;
 
 
   protected override async Task OnInitializedAsync()
@@ -33,6 +32,7 @@ else
       _isAuthenticated = true;
       _userName = user.Identity.Name ?? "Uživatel";
       _email = user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.Email)?.Value ?? "Neznámý e-mail";
+      _userId = user.FindFirst(c => c.Type == "UserId")?.Value ?? "Neznámé ID";
     }
   }
 
