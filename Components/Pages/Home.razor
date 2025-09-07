@@ -1,0 +1,42 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+
+<h3>Kalendář</h3>
+
+
+@if (!_isAuthenticated)
+{
+  <button @onclick="Login">Přihlášení přes Google</button>
+}
+else
+{
+  <p>Ahoj, @_userName! Tvůj e-mail je @_email.</p>
+  <button @onclick="Logout">Odhlášení</button>
+}
+
+
+@code {
+  bool _isAuthenticated;
+  string _userName = string.Empty;
+  string _email = string.Empty;
+
+
+  protected override async Task OnInitializedAsync()
+  {
+    var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+    var user = authState.User;
+    if (user.Identity?.IsAuthenticated is true)
+    {
+      _isAuthenticated = true;
+      _userName = user.Identity.Name ?? "Uživatel";
+      _email = user.FindFirst(c => c.Type == System.Security.Claims.ClaimTypes.Email)?.Value ?? "Neznámý e-mail";
+    }
+  }
+
+
+  void Login() => Navigation.NavigateTo("/login", true);
+  void Logout() => Navigation.NavigateTo("/logout", true);
+}
