@@ -7,13 +7,32 @@
   <base href="/"/>
   <link rel="stylesheet" href="@Assets["app.css"]"/>
   <link rel="stylesheet" href="@Assets["Calendar.styles.css"]"/>
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.4/main.min.css" rel="stylesheet" />
   <ImportMap/>
-  <HeadOutlet @rendermode="InteractiveServer"/>
+  <HeadOutlet @rendermode="new InteractiveServerRenderMode(prerender: false)"/>
 </head>
 
 <body>
-<Routes @rendermode="InteractiveServer"/>
+<Routes @rendermode="new InteractiveServerRenderMode(prerender: false)"/>
 <script src="_framework/blazor.web.js"></script>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.js'></script>
+<script>
+    window.fullCalendarInterop = {
+        initCalendar: function (elementId, events) {
+            const calendarEl = document.getElementById(elementId);
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                events: events
+            });
+            calendar.render();
+        },
+        addEvent: function(elementId, event) {
+            const calendarEl = document.getElementById(elementId);
+            const calendar = FullCalendar.getCalendar(calendarEl);
+            calendar.addEvent(event);
+        }
+    };
+</script>
 </body>
 
 </html>

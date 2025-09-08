@@ -1,7 +1,23 @@
-@page "/Calendar"
-<h3>Kalendář</h3>
+@page "/calendar"
+@inject IJSRuntime JS
 
-<p>Zde se bude zobrazovat kalendar s mymi meetingy.</p>
+<h3>Můj kalendář</h3>
+
+<div id="calendar"></div>
+
 @code {
-  
+  protected override async Task OnAfterRenderAsync(bool firstRender)
+  {
+    if (firstRender)
+    {
+      var events = new[]
+      {
+        new { title = "Meeting s Petrem", start = "2025-09-10" },
+        new { title = "Oběd s týmem", start = "2025-09-12" },
+        new { title = "Deadline projektu", start = "2025-09-15" }
+      };
+
+      await JS.InvokeVoidAsync("fullCalendarInterop.initCalendar", "calendar", events);
+    }
+  }
 }

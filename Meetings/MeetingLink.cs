@@ -7,4 +7,6 @@ public class MeetingLink
     public int UserId { get; set; }
     
     public bool IsUsed { get; set; }
+    
+    public DateTime CreatedAt { get; set; }
 }

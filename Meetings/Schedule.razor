@@ -1,4 +1,6 @@
 @page "/sjednani-schuzky/{Id:guid}"
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
 
 <h3>Sjednání schůzky</h3>
 
@@ -12,15 +14,7 @@ else if (_loading)
 }
 else
 {
-  
-
-  <h4>Stávající schůzky pro tento měsíc:</h4>
-  <ul>
-    @foreach (var m in _existingMeetings)
-    {
-      <li>@m.ScheduledAt.ToString("g")</li>
-    }
-  </ul>
+  <div id="calendar"></div>
 }
 
 @code {
@@ -49,11 +43,21 @@ else
     _loading = false;
   }
 
+  protected override async Task OnAfterRenderAsync(bool firstRender)
+  {
+    
+    if (!_isUsed && !_loading)
+    {
+      var events = _existingMeetings.Select(meeting => new { title = "Schůzka", start = meeting.ScheduledAt.ToString("yyyy-MM-dd") });
+      await JS.InvokeVoidAsync("fullCalendarInterop.initCalendar", "calendar", events);
+    }
+  }
+
   private async Task CreateMeeting()
   {
     await MeetingService.CreateMeetingAsync(Id, _newMeeting);
     await MeetingService.MarkLinkAsUsedAsync(Id);
-
+  
     _existingMeetings = await MeetingService.GetUserMeetingsForMonthAsync(
       (await MeetingService.GetMeetingLinkAsync(Id))!.UserId, DateTime.UtcNow);
   }

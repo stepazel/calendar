@@ -9,8 +9,7 @@ using Microsoft.AspNetCore.Authentication.Google;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 
 builder.Services.AddScoped<IDbConnection>(_ => new Microsoft.Data.SqlClient.SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddTransient<UserService>();
@@ -47,7 +46,7 @@ builder.Services.AddAuthentication(options =>
 
             if (user is null)
             {
-                userId = await userService.CreateUserAsync(email, name);
+                userId = await userService.CreateUserAsync(name, email);
             }
             else
             {
