@@ -23,4 +23,10 @@ public class UserService
         const string sql = "select * from Users where Email = @email";
         return await _db.QuerySingleOrDefaultAsync<User?>(sql, new { email });
     }
+
+    public async Task<User?> GetUserAsync(int id)
+    {
+        const string sql = "select * from Users where Id = @id";
+        return await _db.QuerySingleOrDefaultAsync<User?>(sql, new { id });
+    }
 }

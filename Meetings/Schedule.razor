@@ -1,10 +1,13 @@
 @page "/sjednani-schuzky/{Id:guid}"
+@using Calendar.Users
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.JSInterop
 @using Microsoft.AspNetCore.Components.Forms
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IJSRuntime JS
-
-<h3>Sjednání schůzky</h3>
+@inject NavigationManager NavigationManager
+@inject UserService UserService
 
 @if (_isUsed)
 {
@@ -16,7 +19,10 @@ else if (_loading)
 }
 else
 {
-  <div id="calendar"></div>
+  <h1 class="mb-4 text-4xl font-extrabold tracking-tight text-gray-800 focus-visible:outline-none ">
+    Sjednat schůzku s @Owner.GetNameWithAbbreviatedLastName()
+  </h1>
+  <div id="calendar" class="w-4/5"></div>
 }
 
 @if (_showDialog)
@@ -45,35 +51,47 @@ else
   private string? _selectedDate;
   private bool _showDialog;
   private NewMeetingDto _newMeeting = new();
+  private User Owner { get; set; } = null!;
 
   [Inject] MeetingService MeetingService { get; set; } = null!;
 
   protected override async Task OnInitializedAsync()
   {
     var link = await MeetingService.GetMeetingLinkAsync(Id);
-
     if (link == null || link.IsUsed)
     {
       _isUsed = true;
-    }
-    else
-    {
-      _existingMeetings = await MeetingService.GetUserMeetingsForMonthAsync(link.UserId, DateTime.UtcNow);
+      return;
     }
 
+    var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync(); // TODO Tohle dat do User Service. Pouziva se to i v Home.razor
+    var user = authState.User;
+    if (user.Identity?.IsAuthenticated == true)
+    {
+      var currentUserId = user.FindFirst(c => c.Type == "UserId")?.Value;
+      if (link.UserId.ToString() == currentUserId)
+      {
+        NavigationManager.NavigateTo("/");
+        return;
+      }
+
+    }
+
+    Owner = (await UserService.GetUserAsync(link.UserId))!; // Tady se User urcite nevrati.
+    _existingMeetings = await MeetingService.GetUserMeetingsForMonthAsync(link.UserId, DateTime.UtcNow);
     _loading = false;
   }
 
   protected override async Task OnAfterRenderAsync(bool firstRender)
   {
-    
+
     if (!_isUsed && !_loading)
     {
       var events = _existingMeetings.Select(meeting => new { title = "Schůzka", start = meeting.ScheduledAt.ToString("yyyy-MM-dd") });
       await JS.InvokeVoidAsync("fullCalendarInterop.initCalendar", "calendar", events, DotNetObjectReference.Create(this));
     }
   }
-  
+
   [JSInvokable]
   public void OnDateClick(string dateStr)
   {
@@ -86,7 +104,8 @@ else
   {
     await MeetingService.CreateMeetingAsync(Id, _newMeeting);
     await MeetingService.MarkLinkAsUsedAsync(Id);
-  
-    _existingMeetings.Add(new PrivateMeeting {ScheduledAt = _newMeeting.ScheduledAt});
+
+    _existingMeetings.Add(new PrivateMeeting { ScheduledAt = _newMeeting.ScheduledAt });
   }
+
 }
