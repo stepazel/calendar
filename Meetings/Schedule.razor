@@ -1,5 +1,7 @@
 @page "/sjednani-schuzky/{Id:guid}"
+@using Microsoft.AspNetCore.Components.Web
 @using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Components.Forms
 @inject IJSRuntime JS
 
 <h3>Sjednání schůzky</h3>
@@ -17,12 +19,31 @@ else
   <div id="calendar"></div>
 }
 
+@if (_showDialog)
+{
+  <div class="modal">
+    <div class="modal-content">
+      <h4>Nová schůzka</h4>
+      <p>Vybraný den: @_selectedDate</p>
+      <EditForm Model="_newMeeting" OnValidSubmit="CreateMeeting">
+        <InputText @bind-Value="_newMeeting.ParticipantFirstName" />
+        <InputText @bind-Value="_newMeeting.ParticipantLastName" />
+        <InputText @bind-Value="_newMeeting.ParticipantEmail" />
+        <button type="submit">Uložit</button>
+        <button type="button" @onclick="() => _showDialog = false">Zrušit</button>
+      </EditForm>
+    </div>
+  </div>
+}
+
 @code {
   [Parameter] public Guid Id { get; set; }
 
   private bool _isUsed;
   private bool _loading = true;
   private List<PrivateMeeting> _existingMeetings = new();
+  private string? _selectedDate;
+  private bool _showDialog;
   private NewMeetingDto _newMeeting = new();
 
   [Inject] MeetingService MeetingService { get; set; } = null!;
@@ -49,16 +70,23 @@ else
     if (!_isUsed && !_loading)
     {
       var events = _existingMeetings.Select(meeting => new { title = "Schůzka", start = meeting.ScheduledAt.ToString("yyyy-MM-dd") });
-      await JS.InvokeVoidAsync("fullCalendarInterop.initCalendar", "calendar", events);
+      await JS.InvokeVoidAsync("fullCalendarInterop.initCalendar", "calendar", events, DotNetObjectReference.Create(this));
     }
   }
+  
+  [JSInvokable]
+  public void OnDateClick(string dateStr)
+  {
+    _selectedDate = dateStr;
+    _showDialog = true;
+    StateHasChanged();
+  }
 
-  private async Task CreateMeeting()
+  async Task CreateMeeting()
   {
     await MeetingService.CreateMeetingAsync(Id, _newMeeting);
     await MeetingService.MarkLinkAsUsedAsync(Id);
   
-    _existingMeetings = await MeetingService.GetUserMeetingsForMonthAsync(
-      (await MeetingService.GetMeetingLinkAsync(Id))!.UserId, DateTime.UtcNow);
+    _existingMeetings.Add(new PrivateMeeting {ScheduledAt = _newMeeting.ScheduledAt});
   }
 }

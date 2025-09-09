@@ -18,18 +18,24 @@
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.19/index.global.min.js'></script>
 <script>
     window.fullCalendarInterop = {
-        initCalendar: function (elementId, events) {
+        initCalendar: function (elementId, events, dotNetHelper) {
             const calendarEl = document.getElementById(elementId);
             const calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
-                events: events
+                selectable: true,
+                events: events,
+                dateClick: function(info) {
+                    dotNetHelper.invokeMethodAsync("OnDateClick", info.dateStr);
+                }
             });
             calendar.render();
+            calendarEl._calendar = calendar;
         },
         addEvent: function(elementId, event) {
             const calendarEl = document.getElementById(elementId);
-            const calendar = FullCalendar.getCalendar(calendarEl);
-            calendar.addEvent(event);
+            if (calendarEl && calendarEl._calendar) {
+                calendarEl._calendar.addEvent(event);
+            }
         }
     };
 </script>

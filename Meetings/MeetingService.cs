@@ -43,7 +43,7 @@ public class MeetingService
     {
         const string sql = @"
             INSERT INTO Meetings (MeetingLinkId, ParticipantFirstName, ParticipantLastName, ParticipantEmail, ScheduledAt)
-            VALUES (@LinkId, @Title, @ParticipantFirstName, @ParticipantLastName, @ScheduledAt)";
+            VALUES (@LinkId, @ParticipantFirstName, @ParticipantLastName, @ParticipantEmail, @ScheduledAt)";
 
         await _db.ExecuteAsync(sql, new
         {
