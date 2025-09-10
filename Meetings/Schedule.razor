@@ -6,6 +6,7 @@
 @inject NavigationManager NavigationManager
 @inject UserService UserService
 @inject MeetingService MeetingService
+@inject ScheduleService ScheduleService
 
 <PageTitle>Sjednání schůzky</PageTitle>
 
@@ -32,7 +33,7 @@ else
 }
 
 <dialog id="meetingDialog"
-        class="p-6 rounded-lg fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+        class="p-6 rounded-lg fixed top-2/5 left-2/5">
   <h4>Nová schůzka</h4>
   <p>Den: @_selectedDate?.ToShortDateString()</p>
   <div>
@@ -190,16 +191,10 @@ else
   }
 
 
-  private async Task OnDurationChange(int minutes)
+  private void OnDurationChange(int minutes)
   {
     _selectedDurationMinutes = minutes;
-    await GenerateAvailableSlots();
-  }
-
-  private static bool IsTimeSlotOverlapping(TimeSlot slot, PrivateMeeting meeting)
-  {
-    return slot.StartTime < meeting.ScheduledAt.AddMinutes(meeting.DurationMinutes + 15) &&
-           slot.EndTime > meeting.ScheduledAt.AddMinutes(-15);
+    _availableSlots = GenerateAvailableSlots();
   }
 
   private void OnTimeSlotSelect(TimeSlot slot) => _selectedTimeSlot = slot;
@@ -248,38 +243,11 @@ else
 
   private static List<object> GetCzechHolidays() => CzechHolidaysProvider.Get();
 
-  private Task GenerateAvailableSlots()
+  private List<TimeSlot> GenerateAvailableSlots()
   {
-    if (_selectedDate == null) return Task.CompletedTask;
-
-    var date = _selectedDate.Value;
-    _availableSlots = [];
-
-    var currentTime = new DateTime(date.Year, date.Month, date.Day, 9, 0, 0);
-    var endTime = new DateTime(date.Year, date.Month, date.Day, 16, 0, 0);
-
-    while (currentTime.AddMinutes(_selectedDurationMinutes) <= endTime)
-    {
-      var slot = new TimeSlot
-      {
-        StartTime = currentTime,
-        EndTime = currentTime.AddMinutes(_selectedDurationMinutes),
-        IsAvailable = true,
-        Status = "available"
-      };
-
-      if (_existingMeetings.Any(meeting => IsTimeSlotOverlapping(slot, meeting)))
-      {
-        slot.IsAvailable = false;
-        slot.Status = "occupied";
-      }
-
-      _availableSlots.Add(slot);
-      currentTime = currentTime.AddMinutes(15);
-    }
-
-    StateHasChanged();
-    return Task.CompletedTask;
+    if (_selectedDate == null) return [];
+    
+    return ScheduleService.GenerateAvailableSlots(_selectedDate.Value, _selectedDurationMinutes, _existingMeetings);
   }
 
 }

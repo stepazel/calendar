@@ -14,6 +14,7 @@ builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 builder.Services.AddScoped<IDbConnection>(_ => new Microsoft.Data.SqlClient.SqlConnection(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddTransient<UserService>();
 builder.Services.AddTransient<MeetingService>();
+builder.Services.AddTransient<ScheduleService>();
 
 builder.Services.AddAuthentication(options =>
     {
