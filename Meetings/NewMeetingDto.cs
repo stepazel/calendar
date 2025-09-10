@@ -6,4 +6,6 @@ public class NewMeetingDto
     public string ParticipantLastName { get; set; } = string.Empty;
     public string? ParticipantEmail { get; set; }
     public DateTime ScheduledAt { get; set; }
+    
+    public int DurationMinutes { get; set; }
 }

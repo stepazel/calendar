@@ -31,7 +31,7 @@ public class MeetingService
         var end = start.AddMonths(1);
 
         const string sql = @"
-            SELECT m.Id, m.ScheduledAt
+            SELECT m.ScheduledAt, m.DurationMinutes
             FROM Meetings m
             INNER JOIN MeetingLinks ml ON m.MeetingLinkId = ml.Id
             WHERE ml.UserId = @UserId AND m.ScheduledAt >= @Start AND m.ScheduledAt < @End";
@@ -42,8 +42,8 @@ public class MeetingService
     public async Task CreateMeetingAsync(Guid linkId, NewMeetingDto meeting)
     {
         const string sql = @"
-            INSERT INTO Meetings (MeetingLinkId, ParticipantFirstName, ParticipantLastName, ParticipantEmail, ScheduledAt)
-            VALUES (@LinkId, @ParticipantFirstName, @ParticipantLastName, @ParticipantEmail, @ScheduledAt)";
+            INSERT INTO Meetings (MeetingLinkId, ParticipantFirstName, ParticipantLastName, ParticipantEmail, ScheduledAt, DurationMinutes)
+            VALUES (@LinkId, @ParticipantFirstName, @ParticipantLastName, @ParticipantEmail, @ScheduledAt, @DurationMinutes)";
 
         await _db.ExecuteAsync(sql, new
         {
@@ -51,7 +51,8 @@ public class MeetingService
             meeting.ParticipantFirstName,
             meeting.ParticipantLastName,
             meeting.ParticipantEmail,
-            meeting.ScheduledAt
+            meeting.ScheduledAt,
+            meeting.DurationMinutes,
         });
     }
 
