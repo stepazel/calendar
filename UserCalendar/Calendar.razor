@@ -2,10 +2,13 @@
 @using global::Calendar.Meetings
 @using global::Calendar.Users
 @using Microsoft.JSInterop
+@using Microsoft.AspNetCore.Components.Web
 @inject IJSRuntime JS
 @inject MeetingService MeetingService
 @inject UserService UserService
 @inject NavigationManager NavigationManager
+
+<PageTitle>Můj kalendář</PageTitle>
 
 <h1 class="w-full mb-4 text-4xl font-extrabold tracking-tight text-gray-800 focus-visible:outline-none">
     Můj kalendář

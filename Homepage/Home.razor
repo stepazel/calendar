@@ -3,10 +3,14 @@
 @using global::Calendar.Meetings
 @using Microsoft.JSInterop
 @using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.AspNetCore.Components.Web
 @inject NavigationManager Navigation
 @inject MeetingService MeetingService
 @inject UserService UserService
 @inject IJSRuntime JS
+
+<PageTitle>Kalendář</PageTitle>
+
 <div class="w-2/3 pt-8">
   <div class="flex justify-between items-center">
     <h1 class="mb-4 text-4xl font-extrabold tracking-tight text-gray-800 focus-visible:outline-none">Kalendář</h1>
