@@ -7,6 +7,7 @@
 @inject IJSRuntime JS
 @inject NavigationManager NavigationManager
 @inject UserService UserService
+@inject MeetingService MeetingService
 
 @if (_isUsed)
 {
@@ -18,9 +19,15 @@ else if (_loading)
 }
 else
 {
-  <h1 class="mb-4 text-4xl font-extrabold tracking-tight text-gray-800 focus-visible:outline-none ">
-    Sjednat schůzku s @Owner.GetNameWithAbbreviatedLastName()
-  </h1>
+  <div class="flex flex-col">
+    <h1 class="mb-4 text-4xl font-extrabold tracking-tight text-gray-800 focus-visible:outline-none">
+      Sjednat schůzku s @Owner.GetNameWithAbbreviatedLastName()
+    </h1>
+
+    <h2 class="text-lg text-gray-600">
+      Počet schůzek v tomto měsíci: <span id="count">@UserMeetingsCountThisMonth</span>
+    </h2>
+  </div>
   <div id="calendar" class="w-4/5"></div>
 }
 
@@ -80,7 +87,7 @@ else
       <label for="email" class="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
       <input id="email"
              type="email"
-             @bind-value="_newMeeting.ParticipantEmail"
+             @bind-value="NewMeeting.ParticipantEmail"
              @bind-value:event="oninput"
              class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"/>
     </div>
@@ -90,7 +97,8 @@ else
         <label for="firstName" class="block text-sm font-medium text-gray-700 mb-1">Jméno</label>
         <input id="firstName"
                type="text"
-               @bind="_newMeeting.ParticipantFirstName"
+               @bind-value="NewMeeting.ParticipantFirstName"
+               @bind-value:event="oninput"
                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"/>
       </div>
 
@@ -98,7 +106,8 @@ else
         <label for="lastName" class="block text-sm font-medium text-gray-700 mb-1">Příjmení</label>
         <input id="lastName"
                type="text"
-               @bind="_newMeeting.ParticipantLastName"
+               @bind-value="NewMeeting.ParticipantLastName"
+               @bind-value:event="oninput"
                class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"/>
       </div>
 
@@ -128,30 +137,32 @@ else
   function close() {
     document.getElementById('meetingDialog').close();
   }
+
+  function updateCount(count) {
+    const countElement = document.getElementById('count');
+    if (countElement) {
+      countElement.textContent = count;
+    }
+  }
+
 </script>
 
 @code {
-
-  // TODO Jit postupne:
-  // 1. Dat dialog doprosted a udelat ho trochu hezky DONE
-  // 2. Radiobox s 30 45 60 DONE
-  // 3. Generovani timeslotu na zaklade radioboxu DONE
-  // 4. Jmeno a prijmeni a email DONE
-  // 5. Validace
   [Parameter] public Guid Id { get; set; }
 
   private bool _isUsed;
   private bool _loading = true;
   private List<PrivateMeeting> _existingMeetings = new();
-  private NewMeetingDto _newMeeting = new();
+  private NewMeetingDto NewMeeting { get; } = new();
   private User Owner { get; set; } = null!;
+  private int CurrentMonth { get; set; } = DateTime.Today.Month;
+  private int UserMeetingsCountThisMonth { get; set; }
 
   private List<TimeSlot>? _availableSlots;
   private TimeSlot? _selectedTimeSlot;
   private DateTime? _selectedDate;
   private int _selectedDurationMinutes;
-
-  [Inject] MeetingService MeetingService { get; set; } = null!;
+  private List<object> _holidays;
 
   protected override async Task OnInitializedAsync()
   {
@@ -175,7 +186,9 @@ else
     }
 
     Owner = (await UserService.GetUserAsync(link.UserId))!; // Tady se User urcite nevrati.
-    _existingMeetings = await MeetingService.GetUserMeetingsForMonthAsync(link.UserId, DateTime.UtcNow);
+    _existingMeetings = await MeetingService.GetUserMeetingsAsync(link.UserId, DateTime.UtcNow);
+    UserMeetingsCountThisMonth = _existingMeetings.Count(meeting => meeting.ScheduledAt.Month == CurrentMonth);
+    _holidays = GetCzechHolidays();
     _loading = false;
   }
 
@@ -183,8 +196,8 @@ else
   {
     if (!_isUsed && !_loading)
     {
-      var events = _existingMeetings.Select(meeting => new { title = "Schůzka", start = meeting.ScheduledAt.ToString("yyyy-MM-dd") });
-      await JS.InvokeVoidAsync("fullCalendarInterop.initCalendar", "calendar", events, DotNetObjectReference.Create(this));
+      var events = _existingMeetings.Select(meeting => new { title = meeting.Title, start = meeting.ScheduledAt.ToString("yyyy-MM-dd") });
+      await JS.InvokeVoidAsync("fullCalendarInterop.initCalendar", "calendar", events, _holidays, DotNetObjectReference.Create(this));
     }
   }
 
@@ -205,7 +218,6 @@ else
   public async Task OnDateClick(string dateStr)
   {
     _selectedDate = DateTime.Parse(dateStr);
-    StateHasChanged();
     await ShowDialog();
   }
 
@@ -214,6 +226,67 @@ else
   {
     _selectedDurationMinutes = minutes;
     await GenerateAvailableSlots();
+  }
+
+  private static bool IsTimeSlotOverlapping(TimeSlot slot, PrivateMeeting meeting)
+  {
+    return slot.StartTime < meeting.ScheduledAt.AddMinutes(meeting.DurationMinutes + 15) &&
+           slot.EndTime > meeting.ScheduledAt.AddMinutes(-15);
+  }
+
+  private void OnTimeSlotSelect(TimeSlot slot)
+  {
+    _selectedTimeSlot = slot;
+  }
+
+  private bool CanCreateMeeting()
+  {
+    return _selectedTimeSlot != null &&
+           !string.IsNullOrWhiteSpace(NewMeeting.ParticipantFirstName) &&
+           !string.IsNullOrWhiteSpace(NewMeeting.ParticipantLastName) &&
+           !string.IsNullOrWhiteSpace(NewMeeting.ParticipantEmail);
+  }
+
+  private async Task CreateMeeting()
+  {
+    if (_selectedTimeSlot == null) return;
+
+    NewMeeting.ScheduledAt = _selectedTimeSlot.StartTime;
+    NewMeeting.DurationMinutes = _selectedDurationMinutes;
+    NewMeeting.ParticipantFirstName = NewMeeting.ParticipantFirstName;
+    NewMeeting.ParticipantLastName = NewMeeting.ParticipantLastName;
+    NewMeeting.ParticipantEmail = NewMeeting.ParticipantEmail;
+
+    await MeetingService.CreateMeetingAsync(Id, NewMeeting);
+    await MeetingService.MarkLinkAsUsedAsync(Id);
+
+    _existingMeetings.Add(new PrivateMeeting
+    {
+      Title = $"Vaše schůzka s {Owner.GetNameWithAbbreviatedLastName()}",
+      DurationMinutes = NewMeeting.DurationMinutes,
+      ScheduledAt = NewMeeting.ScheduledAt
+    });
+
+    await CloseDialog();
+    await JS.InvokeVoidAsync("fullCalendarInterop.disableCalendar", "calendar");
+  }
+
+  [JSInvokable]
+  public async Task OnMonthChanged(string dateStr)
+  {
+    var month = DateTime.Parse(dateStr).Month;
+    UserMeetingsCountThisMonth = _existingMeetings.Count(meeting => meeting.ScheduledAt.Month == month);
+    await UpdateCountDisplay(UserMeetingsCountThisMonth);
+  }
+
+  private async Task UpdateCountDisplay(int count)
+  {
+    await JS.InvokeVoidAsync("updateCount", count); // Překreslovala se celá stránka, tak jsem udělal tenhle hack.
+  }
+
+  private static List<object> GetCzechHolidays()
+  {
+    return CzechHolidaysProvider.Get();
   }
 
   private Task GenerateAvailableSlots()
@@ -248,50 +321,6 @@ else
 
     StateHasChanged();
     return Task.CompletedTask;
-  }
-
-  private static bool IsTimeSlotOverlapping(TimeSlot slot, PrivateMeeting meeting)
-  {
-    return slot.StartTime < meeting.ScheduledAt.AddMinutes(meeting.DurationMinutes + 15) &&
-           slot.EndTime > meeting.ScheduledAt.AddMinutes(-15);
-  }
-
-  private void OnTimeSlotSelect(TimeSlot slot)
-  {
-    _selectedTimeSlot = slot;
-  }
-
-  private bool CanCreateMeeting()
-  {
-    return _selectedTimeSlot != null &&
-           !string.IsNullOrWhiteSpace(_newMeeting.ParticipantFirstName) &&
-           !string.IsNullOrWhiteSpace(_newMeeting.ParticipantLastName) &&
-           !string.IsNullOrWhiteSpace(_newMeeting.ParticipantEmail);
-  }
-
-
-  private async Task CreateMeeting()
-  {
-    if (_selectedTimeSlot == null) return;
-
-    _newMeeting.ScheduledAt = _selectedTimeSlot.StartTime;
-    _newMeeting.DurationMinutes = _selectedDurationMinutes;
-    _newMeeting.ParticipantFirstName = _newMeeting.ParticipantFirstName;
-    _newMeeting.ParticipantLastName = _newMeeting.ParticipantLastName;
-    _newMeeting.ParticipantEmail = _newMeeting.ParticipantEmail;
-
-    await MeetingService.CreateMeetingAsync(Id, _newMeeting);
-    await MeetingService.MarkLinkAsUsedAsync(Id);
-
-    await JS.InvokeVoidAsync("fullCalendarInterop.addEvent", "calendar", new
-    {
-      title = $"Vaše schůzka s {Owner.GetNameWithAbbreviatedLastName()}",
-      start = _selectedTimeSlot.StartTime.ToString("yyyy-MM-ddTHH:mm:ss"),
-      end = _selectedTimeSlot.EndTime.ToString("yyyy-MM-ddTHH:mm:ss"),
-      color = "green"
-    });
-
-    await CloseDialog();
   }
 
 }
