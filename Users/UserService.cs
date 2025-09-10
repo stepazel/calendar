@@ -1,15 +1,18 @@
 using System.Data;
 using Dapper;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Calendar.Users;
 
 public class UserService
 {
     private readonly IDbConnection _db;
+    private readonly AuthenticationStateProvider _authStateProvider;
 
-    public UserService(IDbConnection db)
+    public UserService(IDbConnection db, AuthenticationStateProvider authStateProvider)
     {
         _db = db;
+        _authStateProvider = authStateProvider;
     }
 
     public async Task<int> CreateUserAsync(string name, string email)
@@ -28,5 +31,18 @@ public class UserService
     {
         const string sql = "select * from Users where Id = @id";
         return await _db.QuerySingleOrDefaultAsync<User?>(sql, new { id });
+    }
+
+    public int? GetCurrentUserId()
+    {
+        var authState = _authStateProvider.GetAuthenticationStateAsync().Result;
+        var user = authState.User;
+        if (user.Identity?.IsAuthenticated is not true) return null;
+        
+        var userId = user.FindFirst(c => c.Type == "UserId");
+        if (userId != null)
+            return int.Parse(userId.Value);
+        
+        return null;
     }
 }

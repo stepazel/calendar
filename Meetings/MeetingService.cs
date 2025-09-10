@@ -25,7 +25,7 @@ public class MeetingService
         return await _db.QueryFirstOrDefaultAsync<MeetingLink>(sql, new { Id = id });
     }
     
-    public async Task<List<PrivateMeeting>> GetUserMeetingsAsync(int userId, DateTime month)
+    public async Task<List<PrivateMeeting>> GetPrivateMeetingsAsync(int userId, DateTime month)
     {
         var start = new DateTime(month.Year, month.Month, 1);
 
@@ -37,6 +37,18 @@ public class MeetingService
 
         return (await _db.QueryAsync<PrivateMeeting>(sql, new { UserId = userId, Start = start })).ToList();
     }
+
+    public async Task<List<Meeting>> GetMeetingsAsync(int userId)
+    {
+        const string sql = @"
+        select ScheduledAt, ParticipantFirstName, ParticipantLastName, DurationMinutes
+            from Meetings m
+            left join MeetingLinks ml on m.MeetingLinkId = ml.Id
+            where ml.UserId = @UserId";
+    return (await _db.QueryAsync<Meeting>(sql, new { UserId = userId })).ToList();;
+    }
+    
+    
     
     public async Task CreateMeetingAsync(Guid linkId, NewMeetingDto meeting)
     {

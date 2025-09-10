@@ -1,0 +1,65 @@
+@page "/calendar"
+@using global::Calendar.Meetings
+@using global::Calendar.Users
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@inject MeetingService MeetingService
+@inject UserService UserService
+
+<h1 class="w-full mb-4 text-4xl font-extrabold tracking-tight text-gray-800 focus-visible:outline-none">
+    Můj kalendář
+</h1>
+<div id="calendar" class="w-4/5"></div>
+
+@code {
+
+  protected override async Task OnInitializedAsync()
+  {
+    var userId = UserService.GetCurrentUserId();
+    if (userId is null) // Jsem neprihlaseny
+      return;
+    
+    var events = await MeetingService.GetMeetingsAsync(userId.Value);
+    var eventsJs = events.Select(meeting => new { title = GetMeetingTitle(meeting), start = meeting.ScheduledAt.ToString("yyyy-MM-dd") });
+    await JS.InvokeVoidAsync("fullCalendarInterop.initCalendar", "calendar", eventsJs, CzechHolidaysProvider.Get());
+  }
+
+  private static string GetMeetingTitle(Meeting meeting)
+  {
+    return $"{meeting.ScheduledAt:H:mm}-{meeting.ScheduledAt.AddMinutes(meeting.DurationMinutes):H:mm}, {meeting.ParticipantFirstName} {meeting.ParticipantLastName}";
+  }
+}
+
+<script>
+    window.fullCalendarInterop = {
+        initCalendar: function (elementId, events, holidays) {
+            const calendarEl = document.getElementById(elementId);
+
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                locale: 'cs',
+                initialView: 'dayGridMonth',
+                hiddenDays: [0, 6],
+                selectConstraint: 'businessHours',
+                events: [...events, ...holidays],
+               
+                dayCellClassNames: function(arg) {
+                    const dayEvents = calendar.getEvents().filter(event =>
+                        event.start.toDateString() === arg.date.toDateString()
+                    );
+
+                    const meetingsCount = dayEvents.filter(event => event.title === "Schůzka").length;
+                    const isHoliday = dayEvents.some(event => event.title.includes("Svátek"));
+
+                    if (meetingsCount >= 3 || isHoliday) {
+                        return ['disabled-day'];
+                    }
+                    return [];
+                },
+            });
+            calendar.render();
+            calendarEl._calendar = calendar;
+        }
+
+    }
+
+</script>

@@ -1,9 +1,7 @@
 @page "/sjednani-schuzky/{Id:guid}"
 @using Calendar.Users
-@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.JSInterop
-@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject IJSRuntime JS
 @inject NavigationManager NavigationManager
 @inject UserService UserService
@@ -173,20 +171,15 @@ else
       return;
     }
 
-    var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync(); // TODO Tohle dat do User Service. Pouziva se to i v Home.razor
-    var user = authState.User;
-    if (user.Identity?.IsAuthenticated == true)
+    var currentUserId = UserService.GetCurrentUserId();
+    if (link.UserId == currentUserId)
     {
-      var currentUserId = user.FindFirst(c => c.Type == "UserId")?.Value;
-      if (link.UserId.ToString() == currentUserId)
-      {
-        NavigationManager.NavigateTo("/");
-        return;
-      }
+      NavigationManager.NavigateTo("/");
+      return;
     }
-
-    Owner = (await UserService.GetUserAsync(link.UserId))!; // Tady se User urcite nevrati.
-    _existingMeetings = await MeetingService.GetUserMeetingsAsync(link.UserId, DateTime.UtcNow);
+    
+    Owner = (await UserService.GetUserAsync(link.UserId))!; // Tady User urcite nebude null, muzeme pouzit !.
+    _existingMeetings = await MeetingService.GetPrivateMeetingsAsync(link.UserId, DateTime.UtcNow);
     UserMeetingsCountThisMonth = _existingMeetings.Count(meeting => meeting.ScheduledAt.Month == CurrentMonth);
     _holidays = GetCzechHolidays();
     _loading = false;
@@ -324,3 +317,87 @@ else
   }
 
 }
+<script>
+    window.fullCalendarInterop = {
+        initCalendar: function (elementId, events, holidays, dotNetHelper) {
+            const calendarEl = document.getElementById(elementId);
+            const today = new Date();
+            const twoMonthsFromNow = new Date(today);
+            twoMonthsFromNow.setMonth(today.getMonth() + 2);
+
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                locale: 'cs',
+                initialView: 'dayGridMonth',
+                hiddenDays: [0, 6],
+                selectConstraint: 'businessHours',
+                validRange: {
+                    start: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1),
+                    end: twoMonthsFromNow
+                },
+                events: [...events, ...holidays],
+                dateClick: function(info) {
+                    const clickedDate = new Date(info.dateStr);
+                    const dayEvents = calendar.getEvents().filter(event =>
+                        event.start.toDateString() === clickedDate.toDateString()
+                    );
+
+                    // Kontrola počtu schůzek v daný den
+                    const meetingsCount = dayEvents.filter(event => event.title === "Schůzka").length;
+                    if (meetingsCount >= 3) {
+                        return;
+                    }
+
+                    // Kontrola svátků
+                    const isHoliday = dayEvents.some(event => event.title.includes("Svátek"));
+                    if (isHoliday) {
+                        return;
+                    }
+
+                    dotNetHelper.invokeMethodAsync("OnDateClick", info.dateStr);
+                },
+                dayCellClassNames: function(arg) {
+                    const dayEvents = calendar.getEvents().filter(event =>
+                        event.start.toDateString() === arg.date.toDateString()
+                    );
+
+                    const meetingsCount = dayEvents.filter(event => event.title === "Schůzka").length;
+                    const isHoliday = dayEvents.some(event => event.title.includes("Svátek"));
+
+                    if (meetingsCount >= 3 || isHoliday) {
+                        return ['disabled-day'];
+                    }
+                    return [];
+                },
+                datesSet: function(info) {
+                    const viewStart = info.view.currentStart;
+                    dotNetHelper.invokeMethodAsync("OnMonthChanged", viewStart.toISOString());
+                },
+
+            });
+            calendar.render();
+            calendarEl._calendar = calendar;
+        },
+        disableCalendar: function(elementId) {
+            const calendarEl = document.getElementById(elementId);
+            if (calendarEl) {
+                const overlay = document.createElement('div');
+                overlay.style.position = 'absolute';
+                overlay.style.top = '0';
+                overlay.style.left = '0';
+                overlay.style.width = '100%';
+                overlay.style.height = '100%';
+                overlay.style.cursor = 'not-allowed';
+                overlay.style.zIndex = '1000';
+
+                calendarEl.style.position = 'relative';
+                calendarEl.appendChild(overlay);
+
+                if (calendarEl._calendar) {
+                    calendarEl._calendar.setOption('dateClick', null);
+                }
+            }
+        }
+
+    }
+
+</script>
