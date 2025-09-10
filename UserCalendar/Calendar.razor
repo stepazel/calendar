@@ -5,6 +5,7 @@
 @inject IJSRuntime JS
 @inject MeetingService MeetingService
 @inject UserService UserService
+@inject NavigationManager NavigationManager
 
 <h1 class="w-full mb-4 text-4xl font-extrabold tracking-tight text-gray-800 focus-visible:outline-none">
     Můj kalendář
@@ -16,18 +17,20 @@
   protected override async Task OnInitializedAsync()
   {
     var userId = UserService.GetCurrentUserId();
-    if (userId is null) // Jsem neprihlaseny
-      return;
-    
+    if (userId is null) // Jsem neprihlaseny a nemam tu co delat.
+    {
+        NavigationManager.NavigateTo("/");
+        return;
+    }
+
     var events = await MeetingService.GetMeetingsAsync(userId.Value);
-    var eventsJs = events.Select(meeting => new { title = GetMeetingTitle(meeting), start = meeting.ScheduledAt.ToString("yyyy-MM-dd") });
+    var eventsJs = events
+        .Select(meeting => new { title = GetMeetingTitle(meeting), start = meeting.ScheduledAt.ToString("yyyy-MM-dd") });
     await JS.InvokeVoidAsync("fullCalendarInterop.initCalendar", "calendar", eventsJs, CzechHolidaysProvider.Get());
   }
 
-  private static string GetMeetingTitle(Meeting meeting)
-  {
-    return $"{meeting.ScheduledAt:H:mm}-{meeting.ScheduledAt.AddMinutes(meeting.DurationMinutes):H:mm}, {meeting.ParticipantFirstName} {meeting.ParticipantLastName}";
-  }
+  private static string GetMeetingTitle(Meeting meeting) 
+      => $"{meeting.ScheduledAt:H:mm}-{meeting.ScheduledAt.AddMinutes(meeting.DurationMinutes):H:mm}, {meeting.ParticipantFirstName} {meeting.ParticipantLastName}";
 }
 
 <script>
@@ -41,6 +44,7 @@
                 hiddenDays: [0, 6],
                 selectConstraint: 'businessHours',
                 events: [...events, ...holidays],
+                eventOrder: 'start',
                
                 dayCellClassNames: function(arg) {
                     const dayEvents = calendar.getEvents().filter(event =>
